@@ -7,6 +7,8 @@ error_reporting(E_ALL);
 require __DIR__ . '/../includes/db.php';
 require __DIR__ . '/../includes/security.php';
 require __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/scholarship_validator.php';
+require_once __DIR__ . '/../includes/audit.php';
 start_app_session();
 require_role(['Administrator', 'Super-admin']);
 
@@ -65,6 +67,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
   $valid=array_map(fn($o)=>(int)$o['id'],$options[$key]);
   if (array_diff($selected[$key],$valid)) $errors[]='Invalid selection for '.$key;
  }
+ $errors=array_merge($errors,validate_scholarship($data + $selected));
  if ($data['scholarship_name']==='') $errors[]='Scholarship name is required.';
  if (mb_strlen($data['scholarship_name'])>255) $errors[]='Scholarship name is too long.';
  if (!filter_var($data['official_url'],FILTER_VALIDATE_URL) || !in_array(strtolower((string)parse_url($data['official_url'],PHP_URL_SCHEME)),['http','https'],true)) $errors[]='Enter a valid http or https official URL.';
@@ -115,6 +118,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
     $q=$pdo->prepare("INSERT INTO $bridge (scholarship_id,$pk) VALUES (?,?)");
     foreach ($selected[$key] as $value) $q->execute([$id,$value]);
    }
+   log_admin_action($pdo, $editing ? 'edit' : 'create', 'scholarships', (int)$id, current_user_id());
    $pdo->commit();
    header('Location: scholarship_view.php?id='.$id); exit;
   } catch (PDOException $e) {
@@ -131,7 +135,7 @@ function formValue(array $data,string $key): string { return h((string)($data[$k
 <body class="bg-light"><main class="container py-4" style="max-width:1000px">
 <div class="d-flex justify-content-between align-items-center mb-3"><h1 class="h3"><?= $editing?'Edit':'Create' ?> Scholarship</h1><a href="scholarships.php" class="btn btn-outline-secondary">Back to list</a></div>
 <?php if ($errors): ?><div class="alert alert-danger"><strong>Please fix:</strong><ul class="mb-0"><?php foreach ($errors as $error): ?><li><?= h($error) ?></li><?php endforeach; ?></ul></div><?php endif; ?>
-<form method="post" class="card p-4 shadow-sm"><input type="hidden" name="csrf_token" value="<?= h(csrf_token()) ?>">
+<form method="post" id="scholarshipForm" novalidate class="card p-4 shadow-sm"><input type="hidden" name="csrf_token" value="<?= h(csrf_token()) ?>">
 <div class="row g-3">
 <?php foreach ($fields as $key=>$label): ?>
 <div class="col-md-6"><label for="<?= h($key) ?>" class="form-label"><?= h($label) ?><?= in_array($key,['scholarship_name','official_url'],true)?' *':'' ?></label>
@@ -148,4 +152,4 @@ function formValue(array $data,string $key): string { return h((string)($data[$k
 <?php endforeach; ?>
 <?php foreach ($relations as $key=>$spec): ?><div class="col-md-4"><label for="<?= h($key) ?>" class="form-label"><?= h(ucwords(str_replace('_',' ',$key))) ?> (multiple)</label><select class="form-select" name="<?= h($key) ?>[]" id="<?= h($key) ?>" multiple size="7"><?php foreach ($options[$key] as $opt): ?><option value="<?= (int)$opt['id'] ?>" <?= in_array((int)$opt['id'],$selected[$key],true)?'selected':'' ?>><?= h($opt['label']) ?></option><?php endforeach; ?></select><div class="form-text">Hold Command (Mac) or Ctrl to select multiple.</div></div><?php endforeach; ?>
 </div><div class="mt-4 d-flex gap-2"><button class="btn btn-primary" type="submit"><?= $editing?'Save changes':'Create scholarship' ?></button><a class="btn btn-outline-secondary" href="scholarships.php">Cancel</a></div>
-</form></main></body></html>
+</form></main><script src="https://code.jquery.com/jquery-3.7.1.min.js"></script><script src="../js/scholarship-validation.js"></script></body></html>
