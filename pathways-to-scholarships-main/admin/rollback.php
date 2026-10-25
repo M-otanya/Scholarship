@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 require __DIR__ . '/../includes/db.php';
 require __DIR__ . '/../includes/security.php';
+require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/audit.php';
 start_app_session();
 
 $batchId = filter_input(INPUT_GET, 'batch_id', FILTER_VALIDATE_INT);
@@ -59,6 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($update->rowCount() !== 1) {
                 throw new RuntimeException('Could not update batch status.');
             }
+            log_admin_action($pdo, 'rollback', 'import_batches', (int)$batchId, current_user_id());
             $pdo->commit();
             $batch['status'] = 'rolled_back';
             $scholarshipCount = 0;
