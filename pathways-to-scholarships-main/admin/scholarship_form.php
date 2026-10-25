@@ -121,10 +121,10 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
    log_admin_action($pdo, $editing ? 'edit' : 'create', 'scholarships', (int)$id, current_user_id());
    $pdo->commit();
    header('Location: scholarship_view.php?id='.$id); exit;
-  } catch (PDOException $e) {
+  } catch (Throwable $e) {
    if ($pdo->inTransaction()) $pdo->rollBack();
    error_log($e->getMessage());
-   $errors[]=$e->getCode()==='23000'?'Unable to save: the official URL may already belong to another scholarship, or a related record is invalid.':'Unable to save scholarship. Check the server log.';
+   $errors[]=(string)$e->getCode()==='23000'?'Unable to save: the official URL may already belong to another scholarship, or a related record is invalid.':'Unable to save scholarship. Check the server log.';
   }
  }
 }
