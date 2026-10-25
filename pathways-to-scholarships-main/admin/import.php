@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 require __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/audit.php';
 
 if (session_status() !== PHP_SESSION_ACTIVE) session_start();
 if (empty($_SESSION['import_csrf'])) $_SESSION['import_csrf'] = bin2hex(random_bytes(32));
@@ -69,6 +71,7 @@ function upload_stage(PDO $pdo, string $filename, array $rows): int {
         foreach ($rows as $row) {
             $insert->execute([$batchId, $row['line'], json_encode($row['data'], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE)]);
         }
+        log_admin_action($pdo, 'import', 'import_batches', $batchId, current_user_id());
         $pdo->commit();
         return $batchId;
     } catch (Throwable $e) { $pdo->rollBack(); throw $e; }
