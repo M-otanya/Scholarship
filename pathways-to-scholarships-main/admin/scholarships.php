@@ -3,6 +3,8 @@ declare(strict_types=1);
 require __DIR__ . '/../includes/db.php';
 require __DIR__ . '/../includes/security.php';
 require __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/scholarship_validator.php';
+require_once __DIR__ . '/../includes/audit.php';
 start_app_session();
 require_role(['Administrator', 'Super-admin']);
 
@@ -15,10 +17,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $action = (string)($_POST['action'] ?? '');
         $ids = $_POST['ids'] ?? [];
         if (!is_array($ids)) $ids = [];
+        $idErrors = validate_scholarship_ids($ids);
         $ids = array_values(array_unique(array_filter(array_map(static function ($v) {
             return filter_var($v, FILTER_VALIDATE_INT, ['options'=>['min_range'=>1]]) ?: 0;
         }, $ids))));
-        if (!in_array($action, ['archive', 'verify'], true) || !$ids || count($ids) > 500) {
+        if (!in_array($action, ['archive', 'verify'], true) || $idErrors || !$ids || count($ids) > 500) {
             $actionError = 'Choose a valid action and at least one scholarship (maximum 500).';
         } else {
             try {
@@ -30,6 +33,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute(array_merge([current_user_id()], $ids));
                 $changed = $stmt->rowCount();
+                if ($changed > 0) {
+                    foreach ($ids as $recordId) {
+                        log_admin_action($pdo, $action, 'scholarships', (int)$recordId, current_user_id());
+                    }
+                }
                 $pdo->commit();
                 $_SESSION['scholarship_action_message'] = "$changed scholarship record(s) updated.";
                 header('Location: scholarships.php');
