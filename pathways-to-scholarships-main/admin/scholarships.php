@@ -30,12 +30,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $sql = $action === 'archive'
                     ? "UPDATE scholarships SET status='archived', updated_by=? WHERE scholarship_id IN ($placeholders)"
                     : "UPDATE scholarships SET verification_date=CURRENT_DATE(), updated_by=? WHERE scholarship_id IN ($placeholders)";
-                $stmt = $pdo->prepare($sql);
-                $stmt->execute(array_merge([current_user_id()], $ids));
-                $changed = $stmt->rowCount();
-                if ($changed > 0) {
-                    foreach ($ids as $recordId) {
-                        log_admin_action($pdo, $action, 'scholarships', (int)$recordId, current_user_id());
+                $condition = $action === 'archive' ? "status <> 'archived'" : '(verification_date IS NULL OR verification_date <> CURRENT_DATE())';
+                $findChanged = $pdo->prepare("SELECT scholarship_id FROM scholarships WHERE scholarship_id IN ($placeholders) AND $condition FOR UPDATE");
+                $findChanged->execute($ids);
+                $changedIds = array_map('intval', $findChanged->fetchAll(PDO::FETCH_COLUMN));
+                $changed = count($changedIds);
+                if ($changedIds) {
+                    $changedPlaceholders = implode(',', array_fill(0, $changed, '?'));
+                    $sql = $action === 'archive'
+                        ? "UPDATE scholarships SET status='archived', updated_by=? WHERE scholarship_id IN ($changedPlaceholders)"
+                        : "UPDATE scholarships SET verification_date=CURRENT_DATE(), updated_by=? WHERE scholarship_id IN ($changedPlaceholders)";
+                    $stmt = $pdo->prepare($sql);
+                    $stmt->execute(array_merge([current_user_id()], $changedIds));
+                    foreach ($changedIds as $recordId) {
+                        log_admin_action($pdo, $action, 'scholarships', $recordId, current_user_id());
                     }
                 }
                 $pdo->commit();
