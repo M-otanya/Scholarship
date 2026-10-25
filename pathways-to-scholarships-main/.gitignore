@@ -1,0 +1,18 @@
+# Credentials and environment
+config/config.php
+config/*.local.php
+.env
+.htpasswd
+
+# Uploads and logs
+uploads/*
+!uploads/.gitkeep
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+*.bak
