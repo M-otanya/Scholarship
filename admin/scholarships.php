@@ -3,7 +3,6 @@ declare(strict_types=1);
 require __DIR__ . '/../includes/db.php';
 require __DIR__ . '/../includes/security.php';
 require __DIR__ . '/../includes/auth.php';
-require_once __DIR__ . '/../includes/scholarship_validator.php';
 require_once __DIR__ . '/../includes/audit.php';
 start_app_session();
 require_role(['Administrator', 'Super-admin']);
@@ -17,33 +16,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $action = (string)($_POST['action'] ?? '');
         $ids = $_POST['ids'] ?? [];
         if (!is_array($ids)) $ids = [];
-        $idErrors = validate_scholarship_ids($ids);
         $ids = array_values(array_unique(array_filter(array_map(static function ($v) {
             return filter_var($v, FILTER_VALIDATE_INT, ['options'=>['min_range'=>1]]) ?: 0;
         }, $ids))));
-        if (!in_array($action, ['archive', 'verify'], true) || $idErrors || !$ids || count($ids) > 500) {
+        if (!in_array($action, ['archive', 'verify'], true) || !$ids || count($ids) > 500) {
             $actionError = 'Choose a valid action and at least one scholarship (maximum 500).';
         } else {
             try {
                 $pdo->beginTransaction();
+                $userId = current_user_id();
                 $placeholders = implode(',', array_fill(0, count($ids), '?'));
-                $sql = $action === 'archive'
-                    ? "UPDATE scholarships SET status='archived', updated_by=? WHERE scholarship_id IN ($placeholders)"
-                    : "UPDATE scholarships SET verification_date=CURRENT_DATE(), updated_by=? WHERE scholarship_id IN ($placeholders)";
-                $condition = $action === 'archive' ? "status <> 'archived'" : '(verification_date IS NULL OR verification_date <> CURRENT_DATE())';
-                $findChanged = $pdo->prepare("SELECT scholarship_id FROM scholarships WHERE scholarship_id IN ($placeholders) AND $condition FOR UPDATE");
-                $findChanged->execute($ids);
-                $changedIds = array_map('intval', $findChanged->fetchAll(PDO::FETCH_COLUMN));
-                $changed = count($changedIds);
-                if ($changedIds) {
-                    $changedPlaceholders = implode(',', array_fill(0, $changed, '?'));
+                $condition = $action === 'archive' ? "status <> 'archived'" : 'verification_date IS NULL';
+                $find = $pdo->prepare("SELECT scholarship_id FROM scholarships WHERE scholarship_id IN ($placeholders) AND $condition FOR UPDATE");
+                $find->execute($ids);
+                $eligibleIds = array_map('intval', $find->fetchAll(PDO::FETCH_COLUMN));
+                $changed = count($eligibleIds);
+                if ($eligibleIds) {
+                    $eligiblePlaceholders = implode(',', array_fill(0, $changed, '?'));
                     $sql = $action === 'archive'
-                        ? "UPDATE scholarships SET status='archived', updated_by=? WHERE scholarship_id IN ($changedPlaceholders)"
-                        : "UPDATE scholarships SET verification_date=CURRENT_DATE(), updated_by=? WHERE scholarship_id IN ($changedPlaceholders)";
+                        ? "UPDATE scholarships SET status='archived', updated_by=? WHERE scholarship_id IN ($eligiblePlaceholders)"
+                        : "UPDATE scholarships SET verification_date=CURRENT_DATE(), updated_by=? WHERE scholarship_id IN ($eligiblePlaceholders)";
                     $stmt = $pdo->prepare($sql);
-                    $stmt->execute(array_merge([current_user_id()], $changedIds));
-                    foreach ($changedIds as $recordId) {
-                        log_admin_action($pdo, $action, 'scholarships', $recordId, current_user_id());
+                    $stmt->execute(array_merge([$userId], $eligibleIds));
+                    foreach ($eligibleIds as $scholarshipId) {
+                        log_admin_action($pdo, $action, 'scholarships', $scholarshipId, $userId);
                     }
                 }
                 $pdo->commit();

@@ -1,13 +1,9 @@
 <?php
 declare(strict_types=1);
 
-ini_set('display_errors', '1');
-ini_set('display_startup_errors', '1');
-error_reporting(E_ALL);
 require __DIR__ . '/../includes/db.php';
 require __DIR__ . '/../includes/security.php';
 require __DIR__ . '/../includes/auth.php';
-require_once __DIR__ . '/../includes/scholarship_validator.php';
 require_once __DIR__ . '/../includes/audit.php';
 start_app_session();
 require_role(['Administrator', 'Super-admin']);
@@ -67,7 +63,6 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
   $valid=array_map(fn($o)=>(int)$o['id'],$options[$key]);
   if (array_diff($selected[$key],$valid)) $errors[]='Invalid selection for '.$key;
  }
- $errors=array_merge($errors,validate_scholarship($data + $selected));
  if ($data['scholarship_name']==='') $errors[]='Scholarship name is required.';
  if (mb_strlen($data['scholarship_name'])>255) $errors[]='Scholarship name is too long.';
  if (!filter_var($data['official_url'],FILTER_VALIDATE_URL) || !in_array(strtolower((string)parse_url($data['official_url'],PHP_URL_SCHEME)),['http','https'],true)) $errors[]='Enter a valid http or https official URL.';
@@ -118,13 +113,14 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
     $q=$pdo->prepare("INSERT INTO $bridge (scholarship_id,$pk) VALUES (?,?)");
     foreach ($selected[$key] as $value) $q->execute([$id,$value]);
    }
+   // Keep the scholarship update and its audit entry in one transaction.
    log_admin_action($pdo, $editing ? 'edit' : 'create', 'scholarships', (int)$id, current_user_id());
    $pdo->commit();
    header('Location: scholarship_view.php?id='.$id); exit;
-  } catch (Throwable $e) {
+  } catch (Exception $e) {
    if ($pdo->inTransaction()) $pdo->rollBack();
    error_log($e->getMessage());
-   $errors[]=(string)$e->getCode()==='23000'?'Unable to save: the official URL may already belong to another scholarship, or a related record is invalid.':'Unable to save scholarship. Check the server log.';
+   $errors[]=$e->getCode()==='23000'?'Unable to save: the official URL may already belong to another scholarship, or a related record is invalid.':'Unable to save scholarship. Check the server log.';
   }
  }
 }
@@ -135,7 +131,7 @@ function formValue(array $data,string $key): string { return h((string)($data[$k
 <body class="bg-light"><main class="container py-4" style="max-width:1000px">
 <div class="d-flex justify-content-between align-items-center mb-3"><h1 class="h3"><?= $editing?'Edit':'Create' ?> Scholarship</h1><a href="scholarships.php" class="btn btn-outline-secondary">Back to list</a></div>
 <?php if ($errors): ?><div class="alert alert-danger"><strong>Please fix:</strong><ul class="mb-0"><?php foreach ($errors as $error): ?><li><?= h($error) ?></li><?php endforeach; ?></ul></div><?php endif; ?>
-<form method="post" id="scholarshipForm" novalidate class="card p-4 shadow-sm"><input type="hidden" name="csrf_token" value="<?= h(csrf_token()) ?>">
+<form id="scholarshipForm" method="post" class="card p-4 shadow-sm" novalidate><input type="hidden" name="csrf_token" value="<?= h(csrf_token()) ?>">
 <div class="row g-3">
 <?php foreach ($fields as $key=>$label): ?>
 <div class="col-md-6"><label for="<?= h($key) ?>" class="form-label"><?= h($label) ?><?= in_array($key,['scholarship_name','official_url'],true)?' *':'' ?></label>
@@ -147,9 +143,12 @@ function formValue(array $data,string $key): string { return h((string)($data[$k
 <?php elseif ($key==='rolling_deadline'): ?><select class="form-select" name="rolling_deadline" id="rolling_deadline"><option value="0" <?= !$data[$key]?'selected':'' ?>>No</option><option value="1" <?= $data[$key]?'selected':'' ?>>Yes</option></select>
 <?php elseif (in_array($key,['description','notes','eligibility_requirements','residency_requirement'],true)): ?><textarea class="form-control" rows="3" name="<?= h($key) ?>" id="<?= h($key) ?>"><?= formValue($data,$key) ?></textarea>
 <?php else: ?><?php $type=in_array($key,['application_open_date','application_deadline'],true)?'date':(in_array($key,['award_min','award_max','number_of_awards','max_potential_value','minimum_gpa'],true)?'number':($key==='official_url'?'url':'text')); ?>
-<input class="form-control" type="<?= $type ?>" <?= $type==='number'?'min="0" step="'.($key==='number_of_awards'?'1':'0.01').'"':'' ?> name="<?= h($key) ?>" id="<?= h($key) ?>" value="<?= formValue($data,$key) ?>" <?= in_array($key,['scholarship_name','official_url'],true)?'required':'' ?>></input>
+<input class="form-control" type="<?= $type ?>" <?= $type==='number'?'min="0" step="'.($key==='number_of_awards'?'1':'0.01').'"':'' ?> name="<?= h($key) ?>" id="<?= h($key) ?>" value="<?= formValue($data,$key) ?>" <?= in_array($key,['scholarship_name','official_url'],true)?'required':'' ?>>
 <?php endif; ?></div>
 <?php endforeach; ?>
 <?php foreach ($relations as $key=>$spec): ?><div class="col-md-4"><label for="<?= h($key) ?>" class="form-label"><?= h(ucwords(str_replace('_',' ',$key))) ?> (multiple)</label><select class="form-select" name="<?= h($key) ?>[]" id="<?= h($key) ?>" multiple size="7"><?php foreach ($options[$key] as $opt): ?><option value="<?= (int)$opt['id'] ?>" <?= in_array((int)$opt['id'],$selected[$key],true)?'selected':'' ?>><?= h($opt['label']) ?></option><?php endforeach; ?></select><div class="form-text">Hold Command (Mac) or Ctrl to select multiple.</div></div><?php endforeach; ?>
 </div><div class="mt-4 d-flex gap-2"><button class="btn btn-primary" type="submit"><?= $editing?'Save changes':'Create scholarship' ?></button><a class="btn btn-outline-secondary" href="scholarships.php">Cancel</a></div>
-</form></main><script src="https://code.jquery.com/jquery-3.7.1.min.js"></script><script src="../js/scholarship-validation.js"></script></body></html>
+</form></main>
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="../js/scholarship-validation.js"></script>
+</body></html>

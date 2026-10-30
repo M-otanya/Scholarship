@@ -4,8 +4,7 @@ declare(strict_types=1);
 require __DIR__ . '/../includes/db.php';
 require __DIR__ . '/../includes/import_validator.php';
 require __DIR__ . '/../includes/security.php';
-require_once __DIR__ . '/../includes/auth.php';
-require_once __DIR__ . '/../includes/audit.php';
+require __DIR__ . '/../includes/audit.php';
 start_app_session();
 
 $batchId = filter_input(INPUT_GET, 'batch_id', FILTER_VALIDATE_INT);
@@ -208,7 +207,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $updateBatch = $pdo->prepare("UPDATE import_batches SET status = 'committed' WHERE batch_id = ?");
         $updateBatch->execute([$batchId]);
-        log_admin_action($pdo, 'import', 'import_batches', (int)$batchId, current_user_id());
+        log_admin_action($pdo, 'import', 'import_batches', $batchId, 1 /* existing development administrator user_id */);
         $pdo->commit();
         header('Location: commit.php?batch_id=' . $batchId . '&committed=1');
         exit;
