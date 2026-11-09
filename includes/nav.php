@@ -13,6 +13,7 @@
             <div class="navbar-nav">
                 <a class="nav-link" href="/scholarships/pathways-to-scholarships-main/index.php">Home</a>
                 <a class="nav-link" href="/scholarships/pathways-to-scholarships-main/scholarships.php">Scholarships</a>
+                <a class="nav-link" href="/scholarships/pathways-to-scholarships-main/scholarship_facts.php">Scholarship Facts</a>
                 <a class="nav-link" href="/scholarships/pathways-to-scholarships-main/about.php">About</a>
                 <a class="nav-link" href="/scholarships/pathways-to-scholarships-main/faq.php">FAQ</a>
                 <a class="nav-link" href="/scholarships/pathways-to-scholarships-main/contact.php">Contact</a>
@@ -31,6 +32,10 @@
                                 Import History
                             </a>
                         </li>
+                        <li>
+                            <a class="dropdown-item" href="/scholarships/pathways-to-scholarships-main/admin/index.php">
+                                Admin Dashboard
+                            </a>
                     </ul>
                 </div>
             </div>
