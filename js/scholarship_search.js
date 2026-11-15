@@ -24,7 +24,7 @@ $(function () {
     }
     $form.on('submit', function (e) { e.preventDefault(); clearTimeout(timer); refresh(1, true, true); });
     $form.on('change', 'select, input[type=checkbox]', function () { clearTimeout(timer); refresh(1, true, true); });
-    $form.on('input', 'input[name=q]', function () { clearTimeout(timer); timer=setTimeout(function () { refresh(1, true, true); }, 450); });
+    $form.on('input', 'input[name=q]', function () { clearTimeout(timer); timer=setTimeout(function () { refresh(1, false, true); }, 450);
     $results.on('click', '.pagination a', function (e) {
         if ($(this).closest('.disabled').length) { e.preventDefault(); return; }
         e.preventDefault();
