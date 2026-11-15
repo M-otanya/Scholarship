@@ -36,7 +36,7 @@ try {
     $stmt->bindValue(':lim',$perPage,PDO::PARAM_INT); $stmt->bindValue(':off',($page-1)*$perPage,PDO::PARAM_INT);
     $stmt->execute(); $scholarships=$stmt->fetchAll(PDO::FETCH_ASSOC);
     // Log only explicit filter submissions, not pagination, sorting, or initial visits.
-    if (($_GET['log_search'] ?? '') === '1') {
+       if (($_GET['log_search'] ?? '') === '1' && ($filters['state'] || $filters['grade'] || $filters['field'])) {
         $log=$pdo->prepare('INSERT INTO search_log (state_id, grade_id, field_id) VALUES (:state,:grade,:field)');
         foreach (['state','grade','field'] as $key) $log->bindValue(':'.$key,$filters[$key] ?: null,$filters[$key] ? PDO::PARAM_INT : PDO::PARAM_NULL);
         try { $log->execute(); } catch (PDOException $e) { error_log('Search logging: '.$e->getMessage()); }
