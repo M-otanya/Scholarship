@@ -79,6 +79,11 @@ $nsIsSuper = $nsRole === 'super-admin';
                     Contact
                 </a>
 
+                <?php if ($nsRole === 'parent'): ?>
+                    <a class="nav-link" href="<?= h($nsBaseUrl) ?>/parent/dashboard.php">Parent Dashboard</a>
+                    <a class="nav-link" href="<?= h($nsBaseUrl) ?>/parent/children.php">My Children</a>
+                <?php endif; ?>
+
                 <!-- Administrator Navigation -->
                 <?php if ($nsIsAdmin): ?>
 
