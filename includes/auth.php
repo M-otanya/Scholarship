@@ -11,7 +11,7 @@ function auth_base(): string
         dirname($_SERVER['SCRIPT_NAME'] ?? '/index.php')
     );
 
-    if (basename($dir) === 'admin') {
+    if (in_array(basename($dir), ['admin', 'parent'], true)) {
         $dir = dirname($dir);
     }
 
